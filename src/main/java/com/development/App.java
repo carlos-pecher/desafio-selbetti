@@ -35,7 +35,6 @@ public class App
             String fileContent = "";
             FileReader fileReader = new FileReader(file);
             BufferedReader bufferedReader = new BufferedReader(fileReader);
-            fileReader.close();
             
             while ((line = bufferedReader.readLine()) != null) {
                 fileContent += line;
@@ -43,6 +42,7 @@ public class App
             
             System.out.println(fileContent);
             bufferedReader.close();
+            fileReader.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
