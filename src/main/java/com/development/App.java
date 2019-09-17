@@ -10,6 +10,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 
+import com.google.gson.Gson;
+
 public class App 
 {
     public static void main( String[] args )
@@ -24,7 +26,6 @@ public class App
                 HttpClient client = HttpClient.newHttpClient();
                 HttpRequest request = HttpRequest.newBuilder(uri).GET().build();
                 HttpResponse<String> response = client.send(request, BodyHandlers.ofString());
-                //System.out.println(response.body());
                 
                 FileWriter fileWriter = new FileWriter(file);
                 fileWriter.write(response.body());
@@ -40,9 +41,38 @@ public class App
                 fileContent += line;
             }
             
-            System.out.println(fileContent);
             bufferedReader.close();
             fileReader.close();
+
+            Gson gson = new Gson();
+            Answer answer = gson.fromJson(fileContent, Answer.class);
+            String alphabet = "abcdefghijklmnopqrstuvwxyz";
+            String decifrado = "";
+
+            for (int x = 0; x < answer.getCifrado().length(); x++) {
+                char ch = answer.getCifrado().charAt(x);
+                char chAux = ch;
+
+                if (Character.isLetter(ch)) {
+                    int y = (alphabet.indexOf(ch) - answer.getNumeroCasas());
+
+                    if (y < 0) {
+                        y = ((alphabet.length() - 1) + (y + 1));
+                    }
+
+                    chAux = alphabet.charAt(y);
+                }
+
+                decifrado += chAux;
+            }
+
+            answer.setDecifrado(decifrado);
+
+            System.out.println(answer.getNumeroCasas());
+            System.out.println(answer.getToken());
+            System.out.println(answer.getCifrado());
+            System.out.println(answer.getDecifrado());
+            System.out.println(answer.getResumoCriptografico());
         } catch (Exception e) {
             e.printStackTrace();
         }
