@@ -4,11 +4,23 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.IOException;
+import java.math.BigInteger;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpRequest.BodyPublisher;
+import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Random;
 
 import com.google.gson.Gson;
 
@@ -67,14 +79,61 @@ public class App
             }
 
             answer.setDecifrado(decifrado);
+            
+            /**
+             * https://www.geeksforgeeks.org/sha-1-hash-in-java/
+             */
+            MessageDigest crypt = MessageDigest.getInstance("SHA-1");
+            byte[] digest = crypt.digest(decifrado.getBytes("UTF-8"));
+            BigInteger signum = new BigInteger(1, digest);
+            String hash = signum.toString(16);
 
-            System.out.println(answer.getNumeroCasas());
-            System.out.println(answer.getToken());
-            System.out.println(answer.getCifrado());
-            System.out.println(answer.getDecifrado());
-            System.out.println(answer.getResumoCriptografico());
+            while (hash.length() < 32) {
+                hash = "0" + hash;
+            }
+
+            answer.setResumoCriptografico(hash);
+            
+            FileWriter fileWriter = new FileWriter(file);
+            fileWriter.write(gson.toJson(answer));
+            fileWriter.close();
+
+            URI uri = new URI("https://api.codenation.dev/v1/challenge/dev-ps/submit-solution?token=" + token);
+            Map<Object, Object> data = new LinkedHashMap<>();
+            data.put("answer", file.toPath());
+            String boundary = new BigInteger(256, new Random()).toString();
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder(uri).header("Content-Type", "multipart/form-data;boundary=" + boundary).POST(ofMimeMultipartData(data, boundary)).build();
+            HttpResponse<String> response = client.send(request, BodyHandlers.ofString());
+            System.out.println(response.body());
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * https://github.com/ralscha/blog2019/blob/master/java11httpclient/client/src/main/java/ch/rasc/httpclient/File.java#L69-L91
+     */
+    public static BodyPublisher ofMimeMultipartData(Map<Object, Object> data, String boundary) throws IOException {
+        ArrayList<byte[]> byteArrays = new ArrayList<byte[]>();
+        byte[] separator = ("--" + boundary + "\r\nContent-Disposition: form-data; name=")
+                .getBytes(StandardCharsets.UTF_8);
+        for (Map.Entry<Object, Object> entry : data.entrySet()) {
+            byteArrays.add(separator);
+
+            if (entry.getValue() instanceof Path) {
+                var path = (Path) entry.getValue();
+                String mimeType = Files.probeContentType(path);
+                byteArrays.add(("\"" + entry.getKey() + "\"; filename=\"" + path.getFileName() + "\"\r\nContent-Type: "
+                        + mimeType + "\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+                byteArrays.add(Files.readAllBytes(path));
+                byteArrays.add("\r\n".getBytes(StandardCharsets.UTF_8));
+            } else {
+                byteArrays.add(("\"" + entry.getKey() + "\"\r\n\r\n" + entry.getValue() + "\r\n")
+                        .getBytes(StandardCharsets.UTF_8));
+            }
+        }
+        byteArrays.add(("--" + boundary + "--").getBytes(StandardCharsets.UTF_8));
+        return BodyPublishers.ofByteArrays(byteArrays);
     }
 }
